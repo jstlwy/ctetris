@@ -1,0 +1,8 @@
+# macOS-specific
+.DS_Store
+
+# Binary
+tetris
+
+# Object files
+*.o
