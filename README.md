@@ -1,7 +1,7 @@
 # ctetris
 A simple C implementation of Tetris playable in a terminal via ncurses.
 
-Requires libbsd on Linux.
+Requires [libbsd](https://libbsd.freedesktop.org/wiki/) on Linux.
 
 Inspired by Javidx9's version for Windows:
 - [YouTube](https://youtu.be/8OK8_tHeCIA)

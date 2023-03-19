@@ -1,5 +1,8 @@
 #include <ncurses.h>
 #include <stdlib.h>
+#ifdef __linux__
+#include <bsd/stdlib.h>
+#endif
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
