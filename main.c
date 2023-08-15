@@ -7,12 +7,14 @@
 #include <stdbool.h>
 #include <time.h>
 
-int const FIELD_WIDTH = 12;
-int const FIELD_HEIGHT = 18;
-int const FIELD_LENGTH = FIELD_WIDTH * FIELD_HEIGHT;
+#define NUM_TETROMINOES 7
+#define FIELD_WIDTH 12
+#define FIELD_HEIGHT 18
+#define FIELD_LENGTH FIELD_WIDTH * FIELD_HEIGHT
+#define NS_PER_S 1000000000
+#define NS_PER_FRAME 16666667
 
 struct tetromino {
-	//int len;
 	int sidelen;
 	int x;
 	int y;
@@ -27,7 +29,7 @@ void drawHUD(int const score, int const numLinesCleared, int const level);
 void clearLinesFromField(char field[const FIELD_LENGTH],
 	int numLinesToClear, int lowestLineToClear);
 
-void drawPiece(struct tetromino const*const t);
+void drawPiece(struct tetromino const* const t);
 
 //=================
 // ROTATION TABLES
@@ -74,14 +76,14 @@ int const fourRot[4][4][4] = {
 	 { 1,  5,  9, 13},
 	 { 0,  4,  8, 12}}
 };
-int getPieceIndexForRotation(struct tetromino const*const t,
+int getPieceIndexForRotation(struct tetromino const* const t,
 	int const x, int const y);
 
-bool pieceCanFit(char field[const FIELD_LENGTH], struct tetromino const*const t);
+bool pieceCanFit(char const field[const FIELD_LENGTH], struct tetromino const* const t);
 
-void shuffleArray(int bag[static 7]);
+void shuffleArray(int bag[const NUM_TETROMINOES]);
 
-long getTimeDiff(struct timespec* start, struct timespec* stop);
+long getTimeDiff(struct timespec const* const start, struct timespec const* const stop);
 
 int main(void)
 {
@@ -90,7 +92,7 @@ int main(void)
 	// ----------------
 	// Based on the Super Rotation System:
 	// https://tetris.fandom.com/wiki/SRS
-	char const*const tetrominoes[7] = {
+	char const*const tetrominoes[NUM_TETROMINOES] = {
 		"    IIII        ",
 		"ZZ  ZZ   ",
 		" SSSS    ",
@@ -99,18 +101,15 @@ int main(void)
 		"  LLLL   ",
 		"J  JJJ   "
 	};
-	//int const tetrominoLengths[7] = {16, 9, 9, 4, 9, 9, 9};
-	int const tetrominoSideLengths[7] = {4, 3, 3, 2, 3, 3, 3};
+	int const tetrominoSideLengths[NUM_TETROMINOES] = {4, 3, 3, 2, 3, 3, 3};
 
 	// -------------------------
 	// Initialize field map
 	// -------------------------
 	char field[FIELD_LENGTH];
-	for (int y = 0; y < FIELD_HEIGHT; y++)
-	{
+	for (int y = 0; y < FIELD_HEIGHT; y++) {
 		int const fieldRow = y * FIELD_WIDTH;
-		for (int x = 0; x < FIELD_WIDTH; x++)
-		{
+		for (int x = 0; x < FIELD_WIDTH; x++) {
 			int const i = fieldRow + x;
 			if (x == 0 || x == FIELD_WIDTH - 1 || y == FIELD_HEIGHT - 1)
 				field[i] = '#';
@@ -135,7 +134,7 @@ int main(void)
 	curs_set(0);
 
 	// Initialize the array with a random tetromino sequence
-	int pieceBag[7] = {0, 1, 2, 3, 4, 5, 6};
+	int pieceBag[NUM_TETROMINOES] = {0, 1, 2, 3, 4, 5, 6};
 	shuffleArray(pieceBag);
 
 	// --------------------
@@ -164,23 +163,20 @@ int main(void)
 	int maxTicksPerLine = 48;
 	struct timespec start;
 	struct timespec stop;
-	long const nsPerFrame = 16666667;
 	
 	// Ensure game begins with the screen drawn
 	drawField(field);
 	drawHUD(score, totalNumLinesCleared, level);
 
 	bool gameOver = false;
-	while (!gameOver)
-	{
+	while (!gameOver) {
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		shouldForceDownward = (numTicks >= maxTicksPerLine);
 
 		// Process input
 		int const keyInput = getch();
 		int newRotation = t.rot;
-		switch (keyInput)
-		{
+		switch (keyInput) {
 		case 'h':
 		case 'H':
 		case KEY_LEFT:
@@ -214,8 +210,7 @@ int main(void)
 			break;
 		}
 
-		if (newRotation != t.rot)
-		{
+		if (newRotation != t.rot) {
 			int const currentRotation = t.rot;
 			t.rot = newRotation;
 			if (!pieceCanFit(field, &t))
@@ -223,11 +218,9 @@ int main(void)
 		}
 
 		bool shouldFixInPlace = false;
-		if (shouldForceDownward)
-		{
+		if (shouldForceDownward) {
 			t.y++;
-			if (!pieceCanFit(field, &t))
-			{
+			if (!pieceCanFit(field, &t)) {
 				t.y--;
 				shouldFixInPlace = true;
 			}
@@ -238,23 +231,16 @@ int main(void)
 		int numLinesToClear = 0;
 		int lowestLineToClear = 0;
 
-		if (!shouldFixInPlace)
-		{
+		if (!shouldFixInPlace) {
 			drawField(field);
 			drawPiece(&t);
-		}
-		else if (t.y <= 1)
-		{
+		} else if (t.y <= 1) {
 			gameOver = true;
-		}
-		else
-		{
+		} else {
 			// Add piece to field map
-			for (int y = 0; y < t.sidelen; y++)
-			{
+			for (int y = 0; y < t.sidelen; y++) {
 				int const fieldYOffset = (t.y + y) * FIELD_WIDTH;
-				for (int x = 0; x < t.sidelen; x++)
-				{
+				for (int x = 0; x < t.sidelen; x++) {
 					int const pieceIndex = getPieceIndexForRotation(&t, x, y);
 					char const charSprite = t.sprite[pieceIndex];
 					if (charSprite == ' ')
@@ -265,8 +251,7 @@ int main(void)
 			}
 
 			// Check if any lines should be cleared
-			for (int y = 0; y < t.sidelen; y++)
-			{
+			for (int y = 0; y < t.sidelen; y++) {
 				int const screenRow = t.y + y;
 				// Stop if going outside the boundaries
 				if (screenRow >= FIELD_HEIGHT - 1)
@@ -277,11 +262,9 @@ int main(void)
 				int const fieldRow = screenRow * FIELD_WIDTH;
 
 				// Check whether there are any empty spaces in the line
-				for (int x = 1; x < FIELD_WIDTH - 1; x++)
-				{
+				for (int x = 1; x < FIELD_WIDTH - 1; x++) {
 					int const fieldIndex = fieldRow + x;
-					if (field[fieldIndex] == ' ')
-					{
+					if (field[fieldIndex] == ' ') {
 						lineIsFull = false;
 						break;
 					}
@@ -291,8 +274,7 @@ int main(void)
 					continue;
 
 				// Rewrite all the characters with '='
-				for (int x = 1; x < FIELD_WIDTH - 1; x++)
-				{
+				for (int x = 1; x < FIELD_WIDTH - 1; x++) {
 					int const fieldIndex = fieldRow + x;
 					field[fieldIndex] = '=';
 				}
@@ -307,8 +289,7 @@ int main(void)
 
 			// Update game state
 			currentBagIndex++;
-			if (currentBagIndex >= 7)
-			{
+			if (currentBagIndex >= NUM_TETROMINOES) {
 				currentBagIndex = 0;
 				shuffleArray(pieceBag);
 			}
@@ -321,8 +302,7 @@ int main(void)
 			t.sprite = tetrominoes[currentPieceNum];
 		}
 
-		if (numLinesToClear > 0)
-		{
+		if (numLinesToClear > 0) {
 			// Must draw the screen once again
 			// to show the lines disappearing.
 
@@ -336,8 +316,7 @@ int main(void)
 
 			// Scoring system similar to original Nintendo system
 			int const scoringLevel = level + 1;
-			switch (numLinesToClear)
-			{
+			switch (numLinesToClear) {
 			case 1:
 				score += 40 * scoringLevel;
 				break;
@@ -354,8 +333,7 @@ int main(void)
 
 			// Check if level should advance
 			tenLineCounter += numLinesToClear;
-			if (tenLineCounter >= 10)
-			{
+			if (tenLineCounter >= 10) {
 				level++;
 				tenLineCounter -= 10;
 				// Adjust timing
@@ -374,9 +352,8 @@ int main(void)
 		// Wait if necessary to maintain roughly 60 loops per second
 		clock_gettime(CLOCK_MONOTONIC, &stop);
 		long const nsElapsed = getTimeDiff(&start, &stop);
-		if (nsElapsed < nsPerFrame)
-		{
-			struct timespec sleepTime = {0, nsPerFrame - nsElapsed};
+		if (nsElapsed < NS_PER_FRAME) {
+			struct timespec sleepTime = {0, NS_PER_FRAME - nsElapsed};
 			nanosleep(&sleepTime, &sleepTime);
 		}
 	}
@@ -389,11 +366,9 @@ int main(void)
 
 void drawField(char field[const FIELD_LENGTH])
 {
-	for (int y = 0; y < FIELD_HEIGHT; y++)
-	{
+	for (int y = 0; y < FIELD_HEIGHT; y++) {
 		int const fieldRow = y * FIELD_WIDTH;
-		for (int x = 0; x < FIELD_WIDTH; x++)
-		{
+		for (int x = 0; x < FIELD_WIDTH; x++) {
 			int const fieldIndex = fieldRow + x;
 			char const charSprite = field[fieldIndex];
 			mvaddch(y, x, charSprite);
@@ -415,16 +390,14 @@ void drawHUD(int const score, int const numLinesCleared, int const level)
 }
 
 
-void clearLinesFromField(char field[FIELD_LENGTH],
+void clearLinesFromField(char field[const FIELD_LENGTH],
 	int numLinesToClear, int lowestLineToClear)
 {
-	while (numLinesToClear > 0)
-	{
+	while (numLinesToClear > 0) {
 		// Get number of lines to move down
 		int numFullContiguousLines = 1;
 		int const charAboveIndex = ((lowestLineToClear - 1) * FIELD_WIDTH) + 1;
-		for (int i = charAboveIndex; field[i] == '='; i -= FIELD_WIDTH)
-		{
+		for (int i = charAboveIndex; field[i] == '='; i -= FIELD_WIDTH) {
 			numFullContiguousLines++;
 		}
 		
@@ -433,18 +406,13 @@ void clearLinesFromField(char field[FIELD_LENGTH],
 		int const oldYOffset = numFullContiguousLines * FIELD_WIDTH;
 
 		// Move everything in the field array down
-		for (int y = lowestLineToClear; y >= 0; y--)
-		{
+		for (int y = lowestLineToClear; y >= 0; y--) {
 			int const fieldYOffset = y * FIELD_WIDTH;
-			for (int x = 1; x < FIELD_WIDTH - 1; x++)
-			{
+			for (int x = 1; x < FIELD_WIDTH - 1; x++) {
 				int const newFieldIndex = fieldYOffset + x;
-				if (y <= numFullContiguousLines)
-				{
+				if (y <= numFullContiguousLines) {
 					field[newFieldIndex] = ' ';
-				}
-				else
-				{
+				} else {
 					int const oldFieldIndex = newFieldIndex - oldYOffset;
 					field[newFieldIndex] = field[oldFieldIndex];
 				}
@@ -452,28 +420,23 @@ void clearLinesFromField(char field[FIELD_LENGTH],
 		}
 
 		numLinesToClear -= numFullContiguousLines;
-		if (numLinesToClear > 0)
-		{
+		if (numLinesToClear > 0) {
 			// Find the next line that needs to be cleared
 			int fieldIndex;
-			do
-			{
+			do {
 				lowestLineToClear--;
 				fieldIndex = (lowestLineToClear * FIELD_WIDTH) + 1;
-			}
-			while (field[fieldIndex] != '=');
+			} while (field[fieldIndex] != '=');
 		}
 	}
 }
 
 
-void drawPiece(struct tetromino const*const t)
+void drawPiece(struct tetromino const* const t)
 {
-	for (int y = 0; y < t->sidelen; y++)
-	{
+	for (int y = 0; y < t->sidelen; y++) {
 		int const drawY = t->y + y;
-		for (int x = 0; x < t->sidelen; x++)
-		{
+		for (int x = 0; x < t->sidelen; x++) {
 			int const pieceIndex = getPieceIndexForRotation(t, x, y);
 			char const charSprite = t->sprite[pieceIndex];
 			if (charSprite == ' ')
@@ -486,7 +449,7 @@ void drawPiece(struct tetromino const*const t)
 }
 
 
-int getPieceIndexForRotation(struct tetromino const*const t,
+int getPieceIndexForRotation(struct tetromino const* const t,
 	const int x, const int y)
 {
 	int index = 0;
@@ -514,8 +477,7 @@ int getPieceIndexForRotation(struct tetromino const*const t,
 	*/
 
 	// New method using tables:
-	switch (t->sidelen)
-	{
+	switch (t->sidelen) {
 	case 3:
 		index = threeRot[t->rot][y][x];
 		break;
@@ -530,14 +492,12 @@ int getPieceIndexForRotation(struct tetromino const*const t,
 }
 
 
-bool pieceCanFit(char field[const FIELD_LENGTH], struct tetromino const*const t)
+bool pieceCanFit(char const field[const FIELD_LENGTH], struct tetromino const* const t)
 {
-	for (int y = 0; y < t->sidelen; y++)
-	{
+	for (int y = 0; y < t->sidelen; y++) {
 		int const screenRow = t->y + y;
 		int const fieldRow = screenRow * FIELD_WIDTH;
-		for (int x = 0; x < t->sidelen; x++)
-		{
+		for (int x = 0; x < t->sidelen; x++) {
 			int const pieceIndex = getPieceIndexForRotation(t, x, y);
 			if (t->sprite[pieceIndex] == ' ')
 				continue;
@@ -545,8 +505,7 @@ bool pieceCanFit(char field[const FIELD_LENGTH], struct tetromino const*const t)
 			if (screenCol < 1 ||
 			    screenCol >= FIELD_WIDTH ||
 			    screenRow >= FIELD_HEIGHT ||
-			    field[fieldRow + screenCol] != ' ')
-			{
+			    field[fieldRow + screenCol] != ' ') {
 				return false;
 			}
 		}
@@ -555,11 +514,10 @@ bool pieceCanFit(char field[const FIELD_LENGTH], struct tetromino const*const t)
 }
 
 
-void shuffleArray(int bag[static 7])
+void shuffleArray(int bag[const NUM_TETROMINOES])
 {
 	// Fisher-Yates shuffle
-	for (int i = 6; i >= 1; i--)
-	{
+	for (int i = NUM_TETROMINOES - 1; i >= 1; i--) {
 		int const j = arc4random_uniform(i + 1);
 		int const temp = bag[i];
 		bag[i] = bag[j];
@@ -567,11 +525,9 @@ void shuffleArray(int bag[static 7])
 	}
 }
 
-
-long const ns_per_s = 1000000000;
-long getTimeDiff(struct timespec* start, struct timespec* stop)
+long getTimeDiff(struct timespec const* const start, struct timespec const* const stop)
 {
-	long const start_nsec = start->tv_nsec + (start->tv_sec * ns_per_s);
-	long const stop_nsec = stop->tv_nsec + (stop->tv_sec * ns_per_s);
+	long const start_nsec = start->tv_nsec + (start->tv_sec * NS_PER_S);
+	long const stop_nsec = stop->tv_nsec + (stop->tv_sec * NS_PER_S);
 	return stop_nsec - start_nsec;
 }

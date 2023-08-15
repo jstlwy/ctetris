@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall
+CFLAGS := -Wall -Wextra -Werror
 
 OS := $(shell uname)
 ifeq ($(OS), Darwin)
@@ -8,18 +8,17 @@ else
 LDFLAGS := -lncurses -lbsd
 endif
 
-.PHONY: all tetris clean
+.PHONY: all clean
 
 bin := tetris
 
 all: $(bin)
 
 $(bin): main.o
-	$(CC) $^ -o $@ $(LDFLAGS)
+	$(CC) $(LDFLAGS) $^ -o $@
 
-# Generic object file creation rule
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+main.o: main.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 clean:
-	rm -f *.o $(bin)
+	rm -f main.o $(bin)
