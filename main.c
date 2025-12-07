@@ -1,16 +1,17 @@
-#include <ncurses.h>
 #include <stdlib.h>
-#ifdef __linux__
-#include <bsd/stdlib.h>
-#endif
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
+#include <assert.h>
+#ifdef __linux__
+#include <bsd/stdlib.h>
+#endif
+#include <ncurses.h>
 
 #define NUM_TETROMINOES 7
 #define FIELD_WIDTH     12
 #define FIELD_HEIGHT    18
-#define FIELD_LENGTH    FIELD_WIDTH * FIELD_HEIGHT
+#define FIELD_LENGTH    (FIELD_WIDTH * FIELD_HEIGHT)
 #define NS_PER_S        1000000000
 #define NS_PER_FRAME    16666667
 
@@ -92,7 +93,9 @@ void drawPiece(const struct tetromino* const t);
 int getPieceIndexForRotation(const struct tetromino* const t, const int x, const int y);
 bool pieceCanFit(const char field[const FIELD_LENGTH], const struct tetromino* const t);
 void shuffleArray(int bag[const NUM_TETROMINOES]);
-long getTimeDiff(const struct timespec* const start, const struct timespec* const stop);
+#ifdef __linux__
+uint64_t getTimeDiff(const struct timespec* const start, const struct timespec* const stop);
+#endif
 
 int main(void)
 {
@@ -101,7 +104,7 @@ int main(void)
     // ----------------
     // Based on the Super Rotation System:
     // https://tetris.fandom.com/wiki/SRS
-    const char* const tetrominoes[NUM_TETROMINOES] = {
+    static const char* const tetrominoes[NUM_TETROMINOES] = {
         "    IIII        ",
         "ZZ  ZZ   ",
         " SSSS    ",
@@ -110,7 +113,7 @@ int main(void)
         "  LLLL   ",
         "J  JJJ   "
     };
-    const int tetrominoSideLengths[NUM_TETROMINOES] = {4, 3, 3, 2, 3, 3, 3};
+    static const int tetrominoSideLengths[NUM_TETROMINOES] = {4, 3, 3, 2, 3, 3, 3};
 
     // -------------------------
     // Initialize field map
@@ -178,8 +181,12 @@ int main(void)
 
     bool gameOver = false;
     while (!gameOver) {
-        struct timespec start;
-        clock_gettime(CLOCK_MONOTONIC, &start);
+#ifdef __APPLE__
+        const uint64_t startTimeNs = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+#else
+        struct timespec startTime;
+        clock_gettime(CLOCK_MONOTONIC, &startTime);
+#endif
         shouldForceDownward = (numTicks >= maxTicksPerLine);
 
         // Process input
@@ -365,9 +372,13 @@ int main(void)
  
         numTicks++;
         // Wait if necessary to maintain roughly 60 loops per second
-        struct timespec stop;
-        clock_gettime(CLOCK_MONOTONIC, &stop);
-        const long nsElapsed = getTimeDiff(&start, &stop);
+#ifdef __APPLE__
+        const uint64_t nsElapsed = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - startTimeNs;
+#else
+        struct timespec stopTime;
+        clock_gettime(CLOCK_MONOTONIC, &stopTime);
+        const uint64_t nsElapsed = getTimeDiff(&startTime, &stopTime);
+#endif
         if (nsElapsed < NS_PER_FRAME) {
             struct timespec sleepTime = {0, NS_PER_FRAME - nsElapsed};
             nanosleep(&sleepTime, &sleepTime);
@@ -378,7 +389,6 @@ int main(void)
     printf("Final score: %d\n", score);
     return EXIT_SUCCESS;
 }
-
 
 void drawField(char field[const FIELD_LENGTH])
 {
@@ -393,18 +403,17 @@ void drawField(char field[const FIELD_LENGTH])
     refresh();
 }
 
-
 void drawHUD(const int score, const int numLinesCleared, const int level)
 {
-    mvprintw(1, FIELD_WIDTH + 2, "SCORE:");
-    mvprintw(2, FIELD_WIDTH + 2, "%d", score);
-    mvprintw(4, FIELD_WIDTH + 2, "LINES:");
-    mvprintw(5, FIELD_WIDTH + 2, "%d", numLinesCleared);
-    mvprintw(7, FIELD_WIDTH + 2, "LEVEL:");
-    mvprintw(8, FIELD_WIDTH + 2, "%d", level);
+    static const int x = FIELD_WIDTH + 2;
+    mvprintw(1, x, "SCORE:");
+    mvprintw(2, x, "%d", score);
+    mvprintw(4, x, "LINES:");
+    mvprintw(5, x, "%d", numLinesCleared);
+    mvprintw(7, x, "LEVEL:");
+    mvprintw(8, x, "%d", level);
     refresh();
 }
-
 
 void clearLinesFromField(char field[const FIELD_LENGTH], int numLinesToClear, int lowestLineToClear)
 {
@@ -446,7 +455,6 @@ void clearLinesFromField(char field[const FIELD_LENGTH], int numLinesToClear, in
     }
 }
 
-
 void drawPiece(const struct tetromino* const t)
 {
     for (int y = 0; y < t->sidelen; y++) {
@@ -463,7 +471,6 @@ void drawPiece(const struct tetromino* const t)
     }
     refresh();
 }
-
 
 int getPieceIndexForRotation(const struct tetromino* const t, const int x, const int y)
 {
@@ -506,7 +513,6 @@ int getPieceIndexForRotation(const struct tetromino* const t, const int x, const
     return index;
 }
 
-
 bool pieceCanFit(const char field[const FIELD_LENGTH], const struct tetromino* const t)
 {
     for (int y = 0; y < t->sidelen; y++) {
@@ -529,7 +535,6 @@ bool pieceCanFit(const char field[const FIELD_LENGTH], const struct tetromino* c
     return true;
 }
 
-
 void shuffleArray(int bag[const NUM_TETROMINOES])
 {
     // Fisher-Yates shuffle
@@ -541,17 +546,24 @@ void shuffleArray(int bag[const NUM_TETROMINOES])
     }
 }
 
-long getTimeDiff(const struct timespec* const start, const struct timespec* const stop)
+#ifdef __linux__
+uint64_t getTimeDiff(const struct timespec* const start, const struct timespec* const stop)
 {
-    long sec = stop->tv_sec - start->tv_sec;
-    long nsec = stop->tv_nsec - start->tv_nsec;
-    if (sec < 0 && nsec > 0) {
+    assert((stop->tv_sec > start->tv_sec) || ((stop->tv_sec == start->tv_sec) && (stop->tv_nsec >= start->tv_nsec)));
+    int64_t sec = (int64_t)(stop->tv_sec - start->tv_sec);
+    int64_t nsec = (int64_t)(stop->tv_nsec - start->tv_nsec);
+    if (sec < 0) {
+        assert(nsec >= NS_PER_S);
         sec++;
         nsec -= NS_PER_S;
-    } else if (sec > 0 && nsec < 0) {
+    } else if (nsec < 0) {
+        assert(sec >= 1);
         sec--;
         nsec += NS_PER_S;
     }
-    return (sec * NS_PER_S) + nsec;
+    nsec += sec * NS_PER_S;
+    assert(nsec >= 0);
+    return (uint64_t)nsec;
 }
+#endif
 

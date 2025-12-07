@@ -1,10 +1,11 @@
-CC := gcc
 CFLAGS := -Wall -Wextra -Werror
 
 OS := $(shell uname)
 ifeq ($(OS), Darwin)
+CC := clang
 LDFLAGS := -lncurses
 else
+CC := gcc
 LDFLAGS := -lncurses -lbsd
 endif
 
